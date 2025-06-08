@@ -52,10 +52,8 @@ def drive_action_handler(request):
         return ("Request body must be JSON with a 'prompt' key.", 400)
 
     user_prompt = request_json["prompt"]
-    print(f"Received prompt: {user_prompt}")
-
+    
     try:
-        # Call the AI Brain (Anthropic Claude)
         message = anthropic_client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=2048,
@@ -63,21 +61,17 @@ def drive_action_handler(request):
             messages=[{"role": "user", "content": user_prompt}]
         )
         ai_response_text = message.content[0].text
-        print(f"Received raw AI response: {ai_response_text}")
 
-        # --- BULLETPROOF JSON CLEANING ---
-        # Find the start of the JSON object
-        start_index = ai_response_text.find('{')
-        # Find the end of the JSON object
-        end_index = ai_response_text.rfind('}') + 1
+        # --- NEW DETAILED DIAGNOSTIC LOGGING ---
+        print("--- START DIAGNOSTIC LOG ---")
+        print(f"RAW RESPONSE TEXT: {ai_response_text}")
+        print(f"RAW RESPONSE REPRESENTATION: {repr(ai_response_text)}")
+        char_codes = [ord(c) for c in ai_response_text]
+        print(f"CHARACTER CODES: {char_codes}")
+        print("--- END DIAGNOSTIC LOG ---")
         
-        if start_index == -1 or end_index == 0:
-            raise ValueError("Could not find a valid JSON object in the AI response.")
-
-        # Extract the substring that is likely the JSON
-        json_substring = ai_response_text[start_index:end_index]
-        
-        # Parse the extracted substring
+        # We will now try to clean and parse it
+        json_substring = ai_response_text[ai_response_text.find('{'):ai_response_text.rfind('}')+1]
         ai_data = json.loads(json_substring)
         
         file_name = ai_data.get("fileName")
@@ -86,9 +80,11 @@ def drive_action_handler(request):
              return ("AI response was missing fileName or fileContent.", 500)
              
     except Exception as e:
-        print(f"Error calling AI model or parsing response: {e}")
+        # This error is expected, we want to see the logs that came before it.
+        print(f"PARSING FAILED WITH ERROR: {e}")
         return (f"Error processing prompt with AI: {e}", 500)
     
+    # This part will likely not be reached
     try:
         drive_service = get_drive_service()
         result = create_drive_file(drive_service, file_name, file_content)
