@@ -53,7 +53,7 @@ def drive_action_handler(request):
     print(f"Received prompt: {user_prompt}")
 
     try:
-        model = GenerativeModel("gemini-1.5-flash-001", system_instruction=[SYSTEM_INSTRUCTION])
+       model = GenerativeModel("gemini-1.0-pro-001", system_instruction=[SYSTEM_INSTRUCTION])
         response = model.generate_content(user_prompt)
         ai_data = json.loads(response.text)
         file_name = ai_data.get("fileName")
