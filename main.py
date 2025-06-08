@@ -10,7 +10,7 @@ import io
 
 # --- Pre-configured Values ---
 PROJECT_ID = "devstride-grant-integration"
-LOCATION = "us-central1"
+LOCATION = "us-east1"
 PARENT_FOLDER_ID = "1jmrkOSfPo99L5L2onMR3ptvEqLBMWAwk"
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
