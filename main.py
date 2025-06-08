@@ -60,7 +60,7 @@ def drive_action_handler(request):
     print(f"Received prompt: {user_prompt}")
 
     try:
-        # --- Call the AI Brain (Anthropic Claude) ---
+        # Call the AI Brain (Anthropic Claude)
         message = anthropic_client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=2048,
@@ -72,7 +72,7 @@ def drive_action_handler(request):
         ai_response_text = message.content[0].text
         print(f"Received AI response: {ai_response_text}")
 
-        # --- THIS IS THE FIX: Clean the AI response before parsing ---
+        # THIS IS THE FIX: Clean the AI response before parsing
         cleaned_response_text = ai_response_text.strip().replace("```json", "").replace("```", "")
         
         ai_data = json.loads(cleaned_response_text)
