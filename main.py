@@ -44,6 +44,11 @@ def create_drive_file(drive_service, file_name, file_content):
     file = drive_service.files().create(body=file_metadata, media_body=media, fields="id, name").execute()
     return f"Success! Created file '{file.get('name')}' in Google Drive."
 
+def sanitize_for_json(s):
+    """Removes invalid control characters that crash json.loads()."""
+    # Rebuilds the string, allowing only printable characters and standard whitespace
+    return "".join(char for char in s if char.isprintable() or char in ('\n', '\r', '\t'))
+
 @functions_framework.http
 def drive_action_handler(request):
     """The main AI-powered function."""
@@ -52,8 +57,10 @@ def drive_action_handler(request):
         return ("Request body must be JSON with a 'prompt' key.", 400)
 
     user_prompt = request_json["prompt"]
-    
+    print(f"Received prompt: {user_prompt}")
+
     try:
+        # Call the AI Brain (Anthropic Claude)
         message = anthropic_client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=2048,
@@ -61,18 +68,12 @@ def drive_action_handler(request):
             messages=[{"role": "user", "content": user_prompt}]
         )
         ai_response_text = message.content[0].text
+        print(f"Received raw AI response: {repr(ai_response_text)}")
 
-        # --- NEW DETAILED DIAGNOSTIC LOGGING ---
-        print("--- START DIAGNOSTIC LOG ---")
-        print(f"RAW RESPONSE TEXT: {ai_response_text}")
-        print(f"RAW RESPONSE REPRESENTATION: {repr(ai_response_text)}")
-        char_codes = [ord(c) for c in ai_response_text]
-        print(f"CHARACTER CODES: {char_codes}")
-        print("--- END DIAGNOSTIC LOG ---")
+        # --- FINAL, AGGRESSIVE SANITIZATION ---
+        sanitized_text = sanitize_for_json(ai_response_text)
         
-        # We will now try to clean and parse it
-        json_substring = ai_response_text[ai_response_text.find('{'):ai_response_text.rfind('}')+1]
-        ai_data = json.loads(json_substring)
+        ai_data = json.loads(sanitized_text)
         
         file_name = ai_data.get("fileName")
         file_content = ai_data.get("fileContent")
@@ -80,11 +81,9 @@ def drive_action_handler(request):
              return ("AI response was missing fileName or fileContent.", 500)
              
     except Exception as e:
-        # This error is expected, we want to see the logs that came before it.
-        print(f"PARSING FAILED WITH ERROR: {e}")
+        print(f"Error calling AI model or parsing response: {e}")
         return (f"Error processing prompt with AI: {e}", 500)
     
-    # This part will likely not be reached
     try:
         drive_service = get_drive_service()
         result = create_drive_file(drive_service, file_name, file_content)
