@@ -30,11 +30,6 @@ You are a helpful assistant whose purpose is to create documents in Google Drive
 Based on the user's prompt, you must determine a suitable filename and the full text content for the document.
 You must respond in a valid JSON format only, with no other text before or after the JSON block.
 The JSON object must contain two keys: 'fileName' and 'fileContent'.
-For example, if the user prompt is 'create a grocery list', your response should look like this:
-{
-  "fileName": "Grocery List.txt",
-  "fileContent": "- Milk\\n- Bread\\n- Eggs\\n- Cheese"
-}
 """
 
 def get_drive_service():
@@ -65,17 +60,26 @@ def drive_action_handler(request):
             model="claude-3-haiku-20240307",
             max_tokens=2048,
             system=SYSTEM_INSTRUCTION,
-            messages=[
-                {"role": "user", "content": user_prompt}
-            ]
+            messages=[{"role": "user", "content": user_prompt}]
         )
         ai_response_text = message.content[0].text
-        print(f"Received AI response: {ai_response_text}")
+        print(f"Received raw AI response: {ai_response_text}")
 
-        # THIS IS THE FIX: Clean the AI response before parsing
-        cleaned_response_text = ai_response_text.strip().replace("```json", "").replace("```", "")
+        # --- BULLETPROOF JSON CLEANING ---
+        # Find the start of the JSON object
+        start_index = ai_response_text.find('{')
+        # Find the end of the JSON object
+        end_index = ai_response_text.rfind('}') + 1
         
-        ai_data = json.loads(cleaned_response_text)
+        if start_index == -1 or end_index == 0:
+            raise ValueError("Could not find a valid JSON object in the AI response.")
+
+        # Extract the substring that is likely the JSON
+        json_substring = ai_response_text[start_index:end_index]
+        
+        # Parse the extracted substring
+        ai_data = json.loads(json_substring)
+        
         file_name = ai_data.get("fileName")
         file_content = ai_data.get("fileContent")
         if not file_name or file_content is None:
