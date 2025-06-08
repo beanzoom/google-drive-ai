@@ -1,8 +1,8 @@
 import functions_framework
 import google.auth
 import json
-import anthropic  # <-- Changed
-from google.cloud import secretmanager  # <-- Added
+import anthropic
+from google.cloud import secretmanager
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
@@ -51,6 +51,7 @@ def create_drive_file(drive_service, file_name, file_content):
 
 @functions_framework.http
 def drive_action_handler(request):
+    """The main AI-powered function."""
     request_json = request.get_json(silent=True)
     if not request_json or "prompt" not in request_json:
         return ("Request body must be JSON with a 'prompt' key.", 400)
@@ -61,7 +62,7 @@ def drive_action_handler(request):
     try:
         # --- Call the AI Brain (Anthropic Claude) ---
         message = anthropic_client.messages.create(
-            model="claude-3-haiku-20240307",  # Using Haiku for speed and cost-effectiveness
+            model="claude-3-haiku-20240307",
             max_tokens=2048,
             system=SYSTEM_INSTRUCTION,
             messages=[
@@ -71,15 +72,19 @@ def drive_action_handler(request):
         ai_response_text = message.content[0].text
         print(f"Received AI response: {ai_response_text}")
 
-        ai_data = json.loads(ai_response_text)
+        # --- THIS IS THE FIX: Clean the AI response before parsing ---
+        cleaned_response_text = ai_response_text.strip().replace("```json", "").replace("```", "")
+        
+        ai_data = json.loads(cleaned_response_text)
         file_name = ai_data.get("fileName")
         file_content = ai_data.get("fileContent")
         if not file_name or file_content is None:
              return ("AI response was missing fileName or fileContent.", 500)
+             
     except Exception as e:
         print(f"Error calling AI model or parsing response: {e}")
         return (f"Error processing prompt with AI: {e}", 500)
-
+    
     try:
         drive_service = get_drive_service()
         result = create_drive_file(drive_service, file_name, file_content)
